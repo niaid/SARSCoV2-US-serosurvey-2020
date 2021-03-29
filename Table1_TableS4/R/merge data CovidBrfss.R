@@ -9,7 +9,7 @@ library(Hmisc)
 library(mvtnorm)
 library(dplyr)
 
-setwd("/Users/lisherry/Dropbox/Research/Grants Contracts/2019 Contracts NCHSNCI/NCI/real data analysis/")
+setwd("/.../")
 
 #-----------read BRFSS data
 mydata <- sasxport.get("data/LLCP2018.xpt")
