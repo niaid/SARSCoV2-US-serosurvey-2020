@@ -1,6 +1,9 @@
 # SARSCoV2-US-serosurvey-2020 (draft version) 
-Data and R codes for manuscript "Mapping a Pandemic: SARS-CoV-2 Seropositivity in the United States"
-(Data are currently unavailable due to privacy reason, but will be posted later.)
+This repository copntains R code for manuscript "Mapping a Pandemic: SARS-CoV-2 Seropositivity in the United States" by Kalish, et al
+https://www.medrxiv.org/content/10.1101/2021.01.27.21250570v1
+
+The main data collected from the study is not available at this time; therefore the R code is provided only to give a detailed record of how the main analyses were done, and without the data file that code cannot be run to recreate tables and figures in the paper. 
+
 
 
 ## Raw Data
