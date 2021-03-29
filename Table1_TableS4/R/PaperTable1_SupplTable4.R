@@ -10,7 +10,7 @@ library(Hmisc)
 library(mvtnorm)
 library(dplyr)
 library(meanEst)
-setwd("/Users/yanli/Dropbox/Research/Grants Contracts/2019 Contracts NCHSNCI/NCI/")
+setwd("/.../")
 
 data.prpn = read.table(file="real data analysis/data/BRFSS2018COVID9028.csv",header = T,sep=',')
 
