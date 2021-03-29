@@ -107,3 +107,33 @@ mdist.N.census = sapply(1:length(varname.census), function (i)
 names(mdist.N.census) = varname.census
 mdist.N.census
 
+###################------- construct svyglm() object saved as RDS data âlgtreg.x.sel.rds"--------################################
+
+fm.sel=as.formula("A ~ factor(region) + factor(agegr3) + dmsex + factor(RaceGrp3) +
+                  dmethnic_y_n + NCHS_Urban.Rural + children2 + factor(educ3) +
+                  homeowner + factor(employ3) + health_care_coverage + vaccine +
+                  cvd + pulg + immun + had_diabetes + factor(region):factor(agegr3) +
+                  factor(region):dmsex + factor(region):factor(RaceGrp3) +
+                  factor(region):dmethnic_y_n + factor(region):NCHS_Urban.Rural +
+                  factor(region):homeowner + factor(region):factor(employ3) +
+                  factor(region):cvd + factor(agegr3):dmsex + factor(agegr3):factor(RaceGrp3) +
+                  factor(agegr3):dmethnic_y_n + factor(agegr3):NCHS_Urban.Rural +
+                  factor(agegr3):factor(educ3) + factor(agegr3):homeowner +
+                  factor(agegr3):factor(employ3) + factor(agegr3):vaccine +
+                  factor(agegr3):immun + factor(agegr3):had_diabetes + dmsex:factor(RaceGrp3) +
+                  dmsex:children2 + dmsex:factor(employ3) + dmsex:vaccine +
+                  factor(RaceGrp3):dmethnic_y_n + factor(RaceGrp3):NCHS_Urban.Rural +
+                  factor(RaceGrp3):children2 + factor(RaceGrp3):factor(educ3) +
+                  factor(RaceGrp3):factor(employ3) + factor(RaceGrp3):vaccine +
+                  factor(RaceGrp3):pulg + factor(RaceGrp3):immun + dmethnic_y_n:NCHS_Urban.Rural +
+                  dmethnic_y_n:children2 + dmethnic_y_n:factor(educ3) + dmethnic_y_n:homeowner +
+                  dmethnic_y_n:health_care_coverage + dmethnic_y_n:vaccine +
+                  NCHS_Urban.Rural:immun + NCHS_Urban.Rural:had_diabetes +
+                  children2:homeowner + children2:factor(employ3) + factor(educ3):factor(employ3) +
+                  factor(educ3):health_care_coverage + factor(educ3):vaccine +
+                  factor(educ3):pulg + factor(educ3):immun + factor(educ3):had_diabetes +
+                  homeowner:immun + factor(employ3):pulg + health_care_coverage:vaccine +
+                  health_care_coverage:pulg + cvd:immun")
+
+lgtreg.x.sel = svyglm(fm.sel, family = binomial, design = prpn.dsgn)
+               
