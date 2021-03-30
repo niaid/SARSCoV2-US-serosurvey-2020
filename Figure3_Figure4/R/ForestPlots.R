@@ -23,9 +23,8 @@ library(readxl)
 # input svyglm() object which estimates the propensity of being included in the target data
 lgt.objs = readRDS(file="lgtreg.x.sel.rds") 
 
-# create alp and kw pseudoweights
-covid.wt.x.sel<- pseudoweights(lgt.objs, mth='kw', TD = TRUE)
-#covid.wt.x.sel <- readRDS(file="covid2020_x.sel.rds")  
+# input Serosurvey data with kw pseudoweights added
+covid.wt.x.sel <- readRDS(file="covid2020_x.sel.rds")  
 
 
 ### input covid survey data
