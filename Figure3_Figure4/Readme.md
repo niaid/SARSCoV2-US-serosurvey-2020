@@ -15,9 +15,9 @@ Note: Another input data, serosurvey data (*"NIHCOVID19AntibodySt_DATA_CODES_202
 ##### output data folder:
 This folder includes data generated from `ForestPlots.R` and further formatted in excel file (e.g. label editing, adding space) to create Figure 3 and 4. 
 Data list:
-- Copy of Copy of Adjusted_Prevalence_KWmethod_SixQuotaVariable_09Dec2020.xlsx  --- to create Figure 3
-- RemoveItemWithSmallSampleSize \_Adjusted_Prevalence_KWmethod_NotSixQuotaVariable_09Dec2020.xlsx  --- to create Figure 4
-- Copy of PropPositive_SimpleMethod_AllVariables_03Dec2020  --- to calculate positive numbers appeared in Figure 3 and 4
+- *Copy of Copy of Adjusted_Prevalence_KWmethod_SixQuotaVariable_09Dec2020.xlsx*  --- to create Figure 3
+- *RemoveItemWithSmallSampleSize \_Adjusted_Prevalence_KWmethod_NotSixQuotaVariable_09Dec2020.xlsx*  --- to create Figure 4
+- *Copy of PropPositive_SimpleMethod_AllVariables_03Dec2020.xlsx*  --- to calculate positive numbers appeared in Figure 3 and 4
 
 
 
