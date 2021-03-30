@@ -8,10 +8,10 @@ The main data collected from the study is not available at this time; therefore 
 
 ## Raw Data
 
-1. 2018 Behavioral Risk Factor Surveillance (BRFSS) data
- (source: https://www.cdc.gov/brfss/annual_data/annual_2018.html)
-3. U.S. Census data
-4. Serosurvey data
+1. 2018 Behavioral Risk Factor Surveillance (BRFSS) data. The data used are very large, and may be retrieved from the CDC website: 
+ (source: https://www.cdc.gov/brfss/annual_data/annual_2018.html). 
+2. U.S. Census data. The url addresses for the source data, and the R code used to combined different source files is described in the US Census folder. 
+3. Serosurvey data. This is the data collected specifically in this study. Because of privacy issues, care must be made in how it is released. At this time, the data are not part of this repository. 
 
 
 
