@@ -1,0 +1,727 @@
+---
+title: "Ratio of Counts of Undiagnosed+Seropositive Over Diagnosed"
+author: "Michael Fay"
+date: "March 30, 2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+options(scipen=999,width=60)
+```
+```{r, eval=FALSE}
+inline_hook <- function(x) {
+  if (is.numeric(x)) {
+    format(x, digits = 2)
+  } else x
+}
+knitr::knit_hooks$set(inline = inline_hook)
+
+```
+
+
+```{r}
+### CREATE colblind8 = a vector of 8 colors good for people with color blindness
+### see http://jfly.iam.u-toyo.ac.jp/color/#assign
+### see also 
+#   Wong, B (2011). Points of view: Color blindness.
+#     Nature Methods 8: 411 (figure 2).  
+colblind8<-rep(NA,8)
+names(colblind8)<-c("black","orange","skyBlue","bluishGreen",
+     "yellow","blue","vermillion","reddishPurple")
+colblind8[1]<-rgb(0,0,0,maxColorValue=255)
+## orange
+colblind8[2]<-rgb(230,159,0,maxColorValue=255)
+## sky blue
+colblind8[3]<-rgb(86,180,233,maxColorValue=255)
+### bluish green
+colblind8[4]<-rgb(0,158,115,maxColorValue=255)
+colblind8[5]<-rgb(240,228,66,maxColorValue=255)
+colblind8[6]<-rgb(0,114,178,maxColorValue=255)
+colblind8[7]<-rgb(213,94,0,maxColorValue=255)
+colblind8[8]<-rgb(204,121,167,maxColorValue=255)
+```
+
+
+## Update from December 16, 2020 version
+
+In response to reviewers, we added two new sections at the end. Plots of the proportion of the final data set wihtin categories (e.g., regions), and estimates of the rates of previously undiagnosed infections as a fraction of the diagnosed cases, by region. Also, the document was edited for clarity. 
+
+
+## Update from December 13 Version
+
+I added a section at the end with weighted population and diagnosed counts. I also added a plot of the weights by collection time. 
+
+## Overview Ratio of Counts
+
+We are interested in the ratio of the number of "undiagnosed infections" (US adults previously undiagnosed with SARS-CoV-2 infection by PCR, that are seropositive for SARS-CoV-2 antibodies) 
+over "diagnosed cases" (US adults previously diagnosed by PCR) during the time period of the study. Our main estimate of the paper is the rate of undiagnosed infections per total undiagnosed US adults over the study collection time. Loosely speaking, our estimate of the ratio for US adults
+ uses
+$$\frac{\mbox{(number previously undiagnosed adults)} \times \mbox{(rate of undiagnosed infections per undiagnosed adult)}}{\mbox{number previously diagnosed adults}}$$
+
+What makes this estimator difficult is that the data are collected over a few months during which the numbers diagnosed as changing dramatically. We describe the data used to estimate the number previously diagnosed and undiagnosed at any specific date in two separate sections.  Then we describe how the time element is used to get our final estimate. 
+
+## Number Previously Diagnosed
+
+To get the total number of cumulative cases for any date during the study period, we use The COVID Tracking project (covidtracking.com), a
+nd code derived from Chow et al (2020), to get, for any
+date of the study, the total cumulative number of virologically-confirmed cases in the US.
+Here are the total number of cumulative cases over time (in millions). 
+```{r, fig.cap="Total Cumulative Diagnosed (PCR Confirmed Cases)"}
+#covid<-read.csv("H:/My Documents/LID/Memoli 2020 SARSCov2 Seroprevalence/data/external pandemic #data/US/US/covidtimeseries_US.csv")
+covid<-read.csv("../data/covidtimeseries_US.csv")
+covid$dates<- as.Date(covid$dates2,"%m/%d/%y")
+plot(covid$dates, covid$cum_cases/1e6, xlab="Date",ylab="Cum. # Diag. Cases (millions)")
+#axes=FALSE)
+#axis(1)
+#axis(2,at=c(0,2,4,6,8,10)*1e6,label=c(0,2,4,6,8,10),las=2)
+#box()
+```
+
+```{r}
+kids5.17.diag.Sept19<- 277285
+total.diag.Sept19<-covid$cum_cases[covid$dates=="2020-09-19"]
+adult.diag.Sept19<-total.diag.Sept19 - kids5.17.diag.Sept19
+```
+
+For our analysis, we only want the adult cases. By September 19, 2020 there were 277,285 laboratory-confirmed cases of COVID-19 in children ages 5-17 (Leeb, et al, 2020). 
+On the same date the total number of cases was 
+`r total.diag.Sept19`. We estimate the number of adult cases 
+on September 19 by subtracting off the number of ages 5-17 (ignoring cases in children under 5). 
+This gives `r  adult.diag.Sept19`, which gives the percentage of cases that 
+are adults as `r round(100*adult.diag.Sept19/total.diag.Sept19,2)` %.
+So we approximate the cumulative adult cases at any date t, as `r round(adult.diag.Sept19/total.diag.Sept19,4)`
+times the total cumulative cases at t. 
+
+## Number Previously Undiagnosed
+
+
+```{r}
+## Us totals from census popclock
+#studyStart<- as.Date("03/01/20","%m/%d/%y")
+#studyEnd<- as.Date("10/01/2020","%m/%d/%y")
+#dates<-seq(studyStart,studyEnd,by="day")
+#write.csv(as.character(dates),"datesPopclock.csv")
+uspop<-read.csv("../data/datesPopclock.csv")
+uspop$date<- as.Date(uspop$dates,"%Y-%m-%d")
+#class(uspop$date)
+```
+
+To get the numer of adults previously undiagnosed, we can just subtract the number previously diagnosed by time t from the total number of adults in the US at time t. To get the 
+number of adults in the US at time t, we start with the total number of people in the US 
+at time t based on the US census population clock (US Census, 2020).
+
+Here is the population over time:
+```{r, fig.cap="Total US Population Estimates (2020)"}
+plot(uspop$date,uspop$ustotal/1e6,xlab="Date",ylab="Total US Population (millions)")
+```
+
+
+
+
+We can use the 2018 data to adjust that estimate (that is the data we are using for the quota sampling).  In 2018, the adult population was 
+```{r}
+#253,623,658/327,167,434=77.52106%
+US2018.adult<- 253623658
+US2018.total<-327167434
+US2018.pctAdult<- 100*US2018.adult/US2018.total
+```
+
+`r US2018.adult` / `r US2018.total` = `r round(US2018.pctAdult,2)` %
+of the US population. So assume that the proportion of the population that is adult at each date of the study is `r round(US2018.pctAdult,2)` % of the estimated total population at that time. 
+
+## Rates During Study
+
+
+
+
+```{r}
+D<-readRDS("../data/covid_wt_updated_10Dec2020.rds")
+#class(D$survey_taken_date)
+D<-D[order(D$survey_taken_date),]
+# extract the date from the date/time object
+# just pick US/Central as a central time for all 
+D$survey_taken_date.time<- D$survey_taken_date
+D$survey_taken_date<- as.Date(D$survey_taken_date.time, tz="US/Central")
+```
+
+For the final analysis data set we used `r nrow(D)` individuals. We plot the date that the survey was taken for these individuals:
+```{r, fig.cap="Dates Survey Taken for Final Analysis Data Set"}
+plot(D$survey_taken_date,1:nrow(D),xlab="Date Survey Taken",ylab="Cumulative Total")
+```
+
+Using the methods described previously, the main statistic is the overall rate of undiagnosed US adults that were seropositive per undiagnosed US adults. This rate is an average over the time of the study. The rate is weighted for many variables, but there is no weighting for time. 
+The time of sample collection (and survey taken)
+is approximately independent of the quota variables, because the quota sampling was done periodically throughout the study so that for each of those variables the marginal distributions are approximately constant over the course of the main part of the study.
+
+Despite the approximate independence of the quota variables and time, there is a large effect of time in terms of seropositivity -- later samples are more likely to be positive. There are two strategies for adusting for this. First, we can pick a timepoint when about half of the sample is collected and calculate the ratio of counts at that time. In that first approach, the population of previously diagnosed and previously undiagnosed adults in the US are estimated at that middle time point. A second approach is to estimate average the population of previously diagnosed and undiagnosed indivudals over the sample survey times of the individuals. We describe each of those approaches in turn.
+
+
+
+
+## Estimating Counts at the Midpoint of the Study
+
+
+```{r}
+midpoint<- D[round(nrow(D)/2),]$survey_taken_date
+```
+
+To be precise, we use notation to define the values we are trying to estimate. 
+Let 
+
+* $N_{ud}(t) =$ the number of US adults that are were previously undiagnosed by PCR by time t. 
+
+* $N_{dc}(t) =$ the number of US adults that were previously diagnosed by PCR by time t. 
+
+* $N_{udc}(t) =$ the number of US adults that are seropositive at time t and were previously undiagnosed by PCR at time t. 
+
+* $R_{udc/dc}=$ the overal estimate of the rate of seropostive individuals out of the population of US adults that were previously undiagnosed. This is a weighted average of binary seroprevalence assay values for the.
+
+Since $R_{udc/dc}$ is a weighted average of the seropostive rate per undiagnosed US adult, one method for estimating the ratio of the counts is to estimate populations at the midpoint of the study.  For a midpoint of the study, we have two choices. First,  we could use t= July 7, 2020, which is close to the time when half of the study population had been included.  This is the time when about half of the non-region 3 states had their data collected. (Recall, region 3 started early in a pilot phase of the study, but the non-region 3 states only participated in the main part of the study when the quota sampling is taking place. Region 3 states are in both the pilot and the main parts of the study.) 
+Alternatively, we can use `r midpoint` which is the median time of all individuals in the final analysis data set (pilot and main part of the study combined). 
+
+Let $t_m$ be the chosen midpoint. Then we want to estimate 
+$$f_{udc/dc}(t_m) = \frac{N_{udc}(t_m)}{N_{dc}(t_m)} \approx \frac{ \left\{ P_t(t_m) - N_{dc}(t_m) \right\} R_{udc/ud} }{N_{dc}(t_m)}.$$
+where $P_t(t_m)$ is the total US adult population at $t_m$.  As described earlier, we estimate $P_t(t_m)$ using the Census values at $t_m$
+ (which is `r uspop[uspop$date=="2020-07-07","ustotal"]` on July 7, 2020, or 
+ `r uspop[uspop$date==midpoint,"ustotal"]` on `r midpoint`) multiplied by 
+ `r round(US2018.pctAdult/100,4)`, the approximate proportion that are adults.
+ Also described eariler,  we estimate $N_{dc}(t_m)$ by taking the total 
+ counts of cumulative confirmed cases by PCR at time $t_m$
+ (which is `r covid[covid$dates=="2020-07-07","cum_cases"]` on July 7, 2020, or 
+ `r covid[covid$dates==midpoint,"cum_cases"]` on `r midpoint` ),
+ and multiplying it by the approximate proportion that are adults, 
+ `r round(adult.diag.Sept19/total.diag.Sept19,4)`.
+ 
+```{r}
+# calculate the multiplicative factors
+# July 7, 2020
+Pt7.7<- uspop[uspop$date=="2020-07-07","ustotal"] * US2018.pctAdult/100
+Ndc7.7<- covid[covid$dates=="2020-07-07","cum_cases"]*(adult.diag.Sept19/total.diag.Sept19)
+mfact.7.7<-   (Pt7.7 - Ndc7.7)/Ndc7.7
+# midpoint
+Ptmid<- uspop[uspop$date==midpoint,"ustotal"] * US2018.pctAdult/100
+Ndcmid<- covid[covid$dates==midpoint,"cum_cases"]*(adult.diag.Sept19/total.diag.Sept19)
+mfactmid<-   (Ptmid - Ndcmid)/Ndcmid
+```
+ 
+ 
+ 
+In other words, we estimate $f_{udc/dc}(t_m)$ 
+when $t_m=$ July 7, 2020 by 
+$$\hat{f}_{udc/dc}(t_m=07/07/20) = `r round(mfact.7.7,2)` * R_{udc/ud},$$
+and when $t_m=$ `r midpoint` by 
+$$\hat{f}_{udc/dc}(t_m=`r midpoint`) = `r round(mfactmid,2)` * R_{udc/ud}.$$
+
+Here are the estimates and 95% confidence intervals for $R_{udc/ud}$ for the two different threshold 
+defintions:
+```{r}
+prev.OneSpike_OneRBD_3SD<- c(estimate=0.04555983, LCL= 0.02631447, UCL= 0.06490880)
+prev.OneSpike_OneRBD_3SD
+prev.AnySinglePositive_4SD<- c(estimate=0.06568599, LCL= 0.03321048, UCL= 0.09404430)
+prev.AnySinglePositive_4SD
+```
+
+Here is a table of the estimates of $f_{udc/dc}(t_m)$:
+```{r}
+threshold<-c(rep("One.Spike.One.RBD.3SD",2),rep("Any.Single.Positive.4SD",2))
+tm<- rep(c("07/07/20",as.character(midpoint)),2)
+out<-matrix(NA,4,3)
+out[1,]<- prev.OneSpike_OneRBD_3SD*mfact.7.7
+out[2,]<- prev.OneSpike_OneRBD_3SD*mfactmid
+out[3,]<- prev.AnySinglePositive_4SD*mfact.7.7
+out[4,]<- prev.AnySinglePositive_4SD*mfactmid
+tableTm<- data.frame(threshold=threshold, t_m= tm,
+                     estimate=out[,1],
+                     lowerCL=out[,2],
+                     upperCL=out[,3])
+tableTm
+```
+
+ 
+
+
+
+## Estimating Counts by Averaging Over Collection Times
+
+
+Using the midpoint of the study to estimate the population will give a reasonable estimate 
+if the population is changing approximately linearly during the study time,  the 
+cumulative counts of diagnosed adults is changing approximately linearly during the study time,
+and the data are collected uniformly over the study time. Because we want a method that relies less on those assumptions (i.e., one that would give reasonable estimates if the diagnosed cases increased closer to exponentially than linearly, or one that would give reasonable estimates if a small prortion of the same was collected during an extended pilot period and an extended wrap up period [see above Figure]).
+If those assumptions are not met, then we may get a biased estimate. An alternative estimator 
+uses the average of the cumulative case counts, averaged over the dates when the individual samples in the final analysis set were collected. 
+
+
+To be precise, we introduce notation to describe the estimator of the count ratio.
+First, let $R_{udc/dc}$ be the overal estimate of the rate of seropostive individuals out of the population of US adults that were previously undiagnosed. For the $n=$ `r nrow(D)` individuals 
+in the final analysis data set, let $y=\left\{ y_1,\ldots, y_n \right\}$ be the binary seroprevalence assay results (postive=1/negative=0), let $t=\left\{ t_1,\ldots, t_n \right\}$ be the associated dates that the survey (and sample) was taken, and let $x= \left\{ x_1,\ldots, x_n \right\}$ be the list of vectors of covariates used in the weighting model. Let $s_{y,x}(x_i)$ be the standardized weight for the $i$th individual,
+ so that $\sum_{i=1}^{n} s_{y,x}(x_i) =1.$ Then 
+ $$R_{udc/dc} = \sum_{i=1}^{n} s_{y,x}(x_i) y_i.$$
+By basing the weights only on the covariates, $x$, and responses, $y$, 
+and not on the time values, $t$, we are ignoring the changes in the cumulative diagnosis rates 
+over the course of the study. One way to account for those changes over time, is to take an average of the cumulative diagnosed population over the $n$ collection times. 
+
+In other words, we use the same estimators of $P_t(t)$ and $N_{dc}(t)$ as described above, 
+but take averages over the study collection times, rather than use a middle time point of the study.
+Notationally, instead of using 
+$$f_{udc/dc}(t_m)  \approx \frac{ \left\{ P_t(t_m) - N_{dc}(t_m) \right\} R_{udc/ud} }{N_{dc}(t_m)}$$
+to estimate the ratio of counts, we use 
+$$f_{udc/dc}(t_m)  \approx \frac{ \left\{ \bar{P}_t - \bar{N}_{dc} \right\} R_{udc/ud} }{\bar{N}_{dc}},$$
+where 
+$$\bar{P}_t = \frac{1}{n} \sum_{i=1}^{n} P_t(t_i)$$ 
+and 
+$$\bar{N}_{dc} = \frac{1}{n} \sum_{i=1}^{n} N_{dc}(t_i).$$
+```{r}
+PtAvg<- NdcAvg<- 0 
+n<-nrow(D)
+for (i in 1:n){
+  PtAvg<- PtAvg + (1/n)*uspop[uspop$date==D$survey_taken_date[i],"ustotal"] * US2018.pctAdult/100
+  NdcAvg<-NdcAvg+(1/n)* covid[covid$dates==D$survey_taken_date[i],"cum_cases"]*(adult.diag.Sept19/total.diag.Sept19)
+}
+mfactAvg<-   (PtAvg - NdcAvg)/NdcAvg
+```
+
+
+This gives a factor of 
+$$\frac{ \left\{ \bar{P}_t - \bar{N}_{dc} \right\}  }{\bar{N}_{dc}} = `r mfactAvg`.$$
+which gives estimates and 95% confidence intervals for the rate of undiagnosed infections to diagnosed cases:
+```{r}
+threshold<-c("One.Spike.One.RBD.3SD","Any.Single.Positive.4SD")
+out<-matrix(NA,2,3)
+out[1,]<- prev.OneSpike_OneRBD_3SD*mfactAvg
+out[2,]<- prev.AnySinglePositive_4SD*mfactAvg
+tableAvg<- data.frame(threshold=threshold, 
+                     estimate=out[,1],
+                     lowerCL=out[,2],
+                     upperCL=out[,3])
+tableAvg
+```
+
+## Weighted Average of Population Counts
+
+
+```{r}
+# check prev.OneSpike_OneRBD_3SD
+# make sure that the sum of the weights is the estimate
+# this only works for OneSpike_OneRBD_3SD because the 
+# Sensitivity=1 and Specificity =1
+stdwgts<- D$kw.postr5
+stdwgts<- stdwgts/sum(stdwgts)
+D$stdwgts<- stdwgts
+D$OneSpike_OneRBD_3SD_bin<- rep(0,nrow(D))
+D$OneSpike_OneRBD_3SD_bin[D$OneSpike_OneRBD_3SD=="Pos"]<-1
+#mean(D$OneSpike_OneRBD_3SD_bin)
+#sum(D$OneSpike_OneRBD_3SD_bin*stdwgts)
+#prev.OneSpike_OneRBD_3SD
+# any single positive does not match because of the Senisitivity and Specificity
+D$AnySinglePositive_4SD_bin<- rep(0,nrow(D))
+D$AnySinglePositive_4SD_bin[D$AnySinglePositive_4SD=="Pos"]<-1
+#sum(D$AnySinglePositive_4SD_bin*stdwgts)
+#prev.AnySinglePositive_4SD
+```
+
+
+Here is a plot of the standardized weights by date survey taken:
+```{r, fig.cap="Dates Survey Taken by Standardized Weights for Final Analysis Data Set"}
+plot(D$survey_taken_date,D$stdwgts,xlab="Date Survey Taken",ylab="Standardized Weights")
+```
+
+Plotting again on the log scale for the standardized weights, we see that  there is little correlation:
+```{r, fig.cap="Dates Survey Taken by Standardized Weights for Final Analysis Data Set"}
+plot(D$survey_taken_date,D$stdwgts,log="y",xlab="Date Survey Taken",ylab="Standardized Weights (log scale)")
+```
+There is no significant correlation:
+```{r}
+cor.test(as.numeric(D$survey_taken_date),D$stdwgts)
+cor.test(as.numeric(D$survey_taken_date),log10(D$stdwgts))
+```
+ So we try the weighted estimates,  
+$$f_{udc/dc}(t_m)  \approx \frac{ \left\{ \bar{P}_t^{w} - \bar{N}^{w}_{dc} \right\} R_{udc/ud} }{\bar{N}^{w}_{dc}},$$
+where 
+$$\bar{P}_t^{w} =  \sum_{i=1}^{n} s_{x,y}(x_i) P_t(t_i)$$ 
+and 
+$$\bar{N}^{w}_{dc} =  \sum_{i=1}^{n} s_{x,y}(x_i) N_{dc}(t_i).$$
+```{r}
+PtWgtAvg<- NdcWgtAvg<- 0 
+n<-nrow(D)
+for (i in 1:n){
+  PtWgtAvg<- PtWgtAvg + (D$stdwgts[i])*uspop[uspop$date==D$survey_taken_date[i],"ustotal"] * US2018.pctAdult/100
+  NdcWgtAvg<-NdcWgtAvg+
+    (D$stdwgts[i])*covid[covid$dates==D$survey_taken_date[i],"cum_cases"]*(adult.diag.Sept19/total.diag.Sept19)
+}
+mfactWgtAvg<-   (PtWgtAvg - NdcWgtAvg)/NdcWgtAvg
+```
+
+
+This gives a factor of 
+$$\frac{ \left\{ \bar{P}^{w}_t - \bar{N}^{w}_{dc} \right\}  }{\bar{N}^{w}_{dc}} = `r mfactWgtAvg`.$$
+which gives estimates and 95% confidence intervals for the rate of undiagnosed infections to diagnosed cases:
+```{r}
+threshold<-c("One.Spike.One.RBD.3SD","Any.Single.Positive.4SD")
+out<-matrix(NA,2,3)
+out[1,]<- prev.OneSpike_OneRBD_3SD*mfactWgtAvg
+out[2,]<- prev.AnySinglePositive_4SD*mfactWgtAvg
+tableWgtAvg<- data.frame(threshold=threshold, 
+                     estimate=out[,1],
+                     lowerCL=out[,2],
+                     upperCL=out[,3])
+tableWgtAvg
+```
+
+## Data Collection of Time by Covariates
+
+
+To doublecheck that the data are spread out evenly over the time of the study, we plot the date that the survey was taken for these individuals by different covariates.
+
+### By Region
+
+```{r, fig.cap="Dates Survey Taken by Region for Final Analysis Data Set", fig.height=5, fig.width=8}
+RegionNames<- c("Northeast","Mid-West","Mid-Atlantic","South/Central","Mountain/Southwest","West/Pacific")
+par(mfrow=c(1,1))
+  plot(range(D$survey_taken_date),c(0,1),type="n",ylim=c(0,1),xlim=range(D$survey_taken_date),xlab="Date Survey Taken",ylab="Proportion within Region",main="")
+   COL<- c("black","blue","red","green","orange","gray")
+  COL<- colblind8[c(8,5,4,3,2,1)]
+  LTY<-c(1,1,2,1,1,1)
+  LWD<-c(6,5,4,3,2,1)
+Date20pct<-rep(NA,6)
+class(Date20pct)<-"Date"
+for (i in 1:6){
+  Di<- D[D$region==i,]
+  edf<- 1:nrow(Di)/nrow(Di)
+  lines(Di$survey_taken_date,edf,col=COL[i],lwd=LWD[i],lty=LTY[i])
+  # find index of date when about 20% of data are included for the region
+  diff20<- abs(edf - 0.20)
+  pick20<-   c(1:nrow(Di))[diff20==min(diff20)]
+  Date20pct[i]<- Di$survey_taken_date[pick20]
+}
+names(Date20pct)<-RegionNames
+legend("bottomright",legend=RegionNames, lwd=LWD, lty=LTY, col=COL)
+par(mfrow=c(1,1))
+```
+
+We see that the date when 20% of the participants from the region are included in the study is different for the Mid-Atlantic region. 
+```{r}
+Date20pct
+```
+
+\newpage
+
+### By Age Group
+
+```{r, fig.cap="Dates Survey Taken by Age Group for Final Analysis Data Set", fig.height=5, fig.width=8}
+par(mfrow=c(1,1))
+ageGrp<- cut(D$Age_final,
+                        breaks=c(18,45,70,Inf),
+                        include.lowest=TRUE,
+                        labels=c("18-44","45-69","70+"))
+#table(ageGrp)
+#class(ageGrp)
+#table(as.character(ageGrp))
+ageGrp.names<- c("18-44","45-69","70+")
+  plot(range(D$survey_taken_date),c(0,1),type="n",ylim=c(0,1),xlim=range(D$survey_taken_date),xlab="Date Survey Taken",ylab="Proportion within Age Group",main="")
+  COL<- colblind8[c(3,2,1)]
+  LTY<-c(1,1,1)
+  LWD<-c(6,4,2)
+Date20pct.age<-rep(NA,3)
+class(Date20pct.age)<-"Date"
+for (i in 1:3){
+  Di<- D[ageGrp==ageGrp.names[i],]
+  edf<- 1:nrow(Di)/nrow(Di)
+  lines(Di$survey_taken_date,edf,col=COL[i],lwd=LWD[i],lty=LTY[i])
+  # find index of date when about 20% of data are included for the region
+  diff20<- abs(edf - 0.20)
+  pick20<-   c(1:nrow(Di))[diff20==min(diff20)]
+  Date20pct.age[i]<- Di$survey_taken_date[pick20]
+}
+names(Date20pct.age)<-ageGrp.names
+legend("bottomright",legend=ageGrp.names, lwd=LWD, lty=LTY, col=COL)
+par(mfrow=c(1,1))
+```
+
+Here are the dates when 20% of the participants from each age group are included in the study.
+```{r}
+Date20pct.age
+```
+
+\newpage 
+
+### By Sex
+
+```{r, fig.cap="Dates Survey Taken by Sex for Final Analysis Data Set", fig.height=5, fig.width=8}
+par(mfrow=c(1,1))
+
+
+sex.names<- sort(unique(D$Sex_final))
+#sex.names
+  plot(range(D$survey_taken_date),c(0,1),type="n",ylim=c(0,1),xlim=range(D$survey_taken_date),xlab="Date Survey Taken",ylab="Proportion within Each Sex",main="")
+  COL<- colblind8[c(2,1)]
+  LTY<-c(1,1)
+  LWD<-c(6,3)
+Date20pct.sex<-rep(NA,3)
+class(Date20pct.sex)<-"Date"
+for (i in 1:2){
+  Di<- D[D$Sex_final==sex.names[i],]
+  edf<- 1:nrow(Di)/nrow(Di)
+  lines(Di$survey_taken_date,edf,col=COL[i],lwd=LWD[i],lty=LTY[i])
+  # find index of date when about 20% of data are included for the region
+  diff20<- abs(edf - 0.20)
+  pick20<-   c(1:nrow(Di))[diff20==min(diff20)]
+  Date20pct.sex[i]<- Di$survey_taken_date[pick20]
+}
+names(Date20pct.sex)<- sex.names
+legend("bottomright",legend=sex.names, lwd=LWD, lty=LTY, col=COL)
+par(mfrow=c(1,1))
+```
+
+Here are the dates when 20% of the participants from each sex are included in the study.
+```{r}
+Date20pct.sex
+```
+
+\newpage 
+
+### By Race 
+
+Note: "Others" are those that wrote in a race, instead of checking one or more of the specified categories.
+
+```{r, fig.cap="Dates Survey Taken by Race for Final Analysis Data Set", fig.height=5, fig.width=8}
+par(mfrow=c(1,1))
+
+
+race.names<- sort(unique(D$Race_final))
+#sex.names
+  plot(range(D$survey_taken_date),c(0,1),type="n",ylim=c(0,1),xlim=range(D$survey_taken_date),xlab="Date Survey Taken",ylab="Proportion within Each Self Identified Race",main="")
+  COL<- colblind8[c(8,7,6,4,3,2,1)]
+  LTY<-c(1,1,1,1,1,1,1)
+  LWD<-c(7:1)
+Date20pct.race<-rep(NA,7)
+class(Date20pct.race)<-"Date"
+for (i in 1:7){
+  Di<- D[D$Race_final==race.names[i],]
+  edf<- 1:nrow(Di)/nrow(Di)
+  lines(Di$survey_taken_date,edf,col=COL[i],lwd=LWD[i],lty=LTY[i])
+  # find index of date when about 20% of data are included for the region
+  diff20<- abs(edf - 0.20)
+  pick20<-   c(1:nrow(Di))[diff20==min(diff20)]
+  Date20pct.race[i]<- Di$survey_taken_date[pick20]
+}
+names(Date20pct.race)<- race.names
+legend("bottomright",legend=race.names, lwd=LWD, lty=LTY, col=COL)
+par(mfrow=c(1,1))
+```
+
+Here are the dates when 20% of the participants from each self-identified race are included in the study.
+```{r}
+Date20pct.race
+```
+
+\newpage
+
+### By Ethnicity (Hispanic/Non-Hispanic)
+
+```{r, fig.cap="Dates Survey Taken by Ethnicity for Final Analysis Data Set", fig.height=5, fig.width=8}
+par(mfrow=c(1,1))
+
+
+ethnicity.names<- sort(unique(D$Ethnicity_final))
+#sex.names
+  plot(range(D$survey_taken_date),c(0,1),type="n",ylim=c(0,1),xlim=range(D$survey_taken_date),xlab="Date Survey Taken",ylab="Proportion within Each Ethnicity",main="")
+  COL<- colblind8[c(2,1)]
+  LTY<-c(1,1)
+  LWD<-c(6:3)
+Date20pct.ethnicity<-rep(NA,2)
+class(Date20pct.ethnicity)<-"Date"
+for (i in 1:2){
+  Di<- D[D$Ethnicity_final==ethnicity.names[i],]
+  edf<- 1:nrow(Di)/nrow(Di)
+  lines(Di$survey_taken_date,edf,col=COL[i],lwd=LWD[i],lty=LTY[i])
+  # find index of date when about 20% of data are included for the region
+  diff20<- abs(edf - 0.20)
+  pick20<-   c(1:nrow(Di))[diff20==min(diff20)]
+  Date20pct.ethnicity[i]<- Di$survey_taken_date[pick20]
+}
+ethnicity.names[ethnicity.names=="Yes"]<-"Hispanic"
+ethnicity.names[ethnicity.names=="No"]<-"Non-Hispanic"
+names(Date20pct.ethnicity)<- ethnicity.names
+
+legend("bottomright",legend=ethnicity.names, lwd=LWD, lty=LTY, col=COL)
+par(mfrow=c(1,1))
+```
+
+Here are the dates when 20% of the participants from each ethnicity are included in the study.
+```{r}
+Date20pct.ethnicity
+```
+
+\newpage 
+
+### By Urban/Rural
+
+```{r, fig.cap="Dates Survey Taken by Urban/Rural for Final Analysis Data Set", fig.height=5, fig.width=8}
+par(mfrow=c(1,1))
+
+
+urban.names<- sort(unique(D$urban.rural2))
+#sex.names
+  plot(range(D$survey_taken_date),c(0,1),type="n",ylim=c(0,1),xlim=range(D$survey_taken_date),xlab="Date Survey Taken",ylab="Proportion within Urban/Rural",main="")
+  COL<- colblind8[c(2,1)]
+  LTY<-c(1,1)
+  LWD<-c(6:3)
+Date20pct.urban<-rep(NA,2)
+class(Date20pct.urban)<-"Date"
+for (i in 1:2){
+  Di<- D[D$urban.rural2==urban.names[i],]
+  edf<- 1:nrow(Di)/nrow(Di)
+  lines(Di$survey_taken_date,edf,col=COL[i],lwd=LWD[i],lty=LTY[i])
+  # find index of date when about 20% of data are included for the region
+  diff20<- abs(edf - 0.20)
+  pick20<-   c(1:nrow(Di))[diff20==min(diff20)]
+  Date20pct.urban[i]<- Di$survey_taken_date[pick20]
+}
+urban.names<- as.character(urban.names)
+urban.names[urban.names=="1"]<-"(mostly) Rural"
+urban.names[urban.names=="2"]<-"Urban"
+names(Date20pct.urban)<- urban.names
+
+legend("bottomright",legend=urban.names, lwd=LWD, lty=LTY, col=COL)
+par(mfrow=c(1,1))
+```
+
+Here are the dates when 20% of the participants from urban or rural are included in the study.
+```{r}
+Date20pct.urban
+```
+
+\newpage
+
+## Calculating the Ratio Separately by Region
+
+We repeat the section "Estimating Counts by Averaging Over Collection Times", except we get the average counts for each region. 
+
+
+
+
+Expand the notation, adding a superscript $(k)$ to denote the $k$th region. For example, 
+$P_t^{(k)}(t_i)$ is the population size in region $k$ at time $t_i$, and similarly define 
+$N_{dc}^{(k)}(t_i)$ as the cumulative number of diagnosed cases in region $k$ at time $t_i$.
+Also let $n_k$ be the number in the sample from the $k$th region, and $I_k$ be the set of indices from the $k$th region. We use 
+$$f_{udc/dc}^{(k)}(t_m)  \approx \frac{ \left\{ \bar{P}_{t}^{(k)} - \bar{N}_{dc}^{(k)} \right\} R_{udc/ud}^{(k)} }{\bar{N}_{dc}^{(k)}},$$
+where 
+$$\bar{P}_t^{(k)} = \frac{1}{n_k} \sum_{i \in I_k} P_t^{(k)}(t_i)$$ 
+and 
+$$\bar{N}_{dc}^{(k)} = \frac{1}{n_k} \sum_{i \in I_k} N_{dc}^{(k)}(t_i).$$
+
+We get  the US Census estimates of the adult population (18 years old or older) by state on July 1, 2020 from a recent data release on December 22, 2020 (after the original analysis was already completed, data accessed on March 25, 2021):
+
+https://www2.census.gov/programs-surveys/popest/tables/2010-2020/state/totals/sc-est2020-18+pop-res.xlsx
+
+```{r}
+uspopByState.1July2020<-read.csv("../data/USCensusBYState1July2020.csv",header=TRUE)
+```
+
+We use the previously used total US population by date from the Census population clock to get a multiplier for each date. Let $t_0$ be July 1, 2020, and let  $$b_t(t_i) = \frac{P_{t}(t_i)}{P_t(t_0)}$$ be the total US population at $t_i$ as the proportion of the July 1, 2020 total population (by the US census population clock, see above). 
+Let $P_t^{(k)}(t_0)$ be the estimated adult US population in region $k$ (by the Dec 22, 2020 estimate released by the US Census), and we estimate the adult US population in region $k$ at $t_i$ by 
+$P_t^{(k)}(t_i) = b_t(t_i) P_t^{(k)}(t_0)$.
+
+```{r}
+# create data set of cumulative counts of positive PCR by state, by date, 
+# with a region column 
+# now, reload the StateTotal object
+load("../data/statetotals_extractCombine.RData")
+# load keys to assign states to regions
+load("../data/stateRegions.RData")
+# only rename state abbreviation variable, and add region variable
+stateRegions$state <- stateRegions$abb
+StateTotalR<- merge(StateTotal,stateRegions[,c("state","region")], by="state")
+StateTotalR$date<- as.Date(as.character(StateTotalR$date))
+
+# Get the adult population by region on July 1, 2020
+uspopByState.1July2020<- merge(uspopByState.1July2020, 
+                                stateRegions[,c("stateName","region")], by="stateName")
+
+usAdult.1July2020.R<- rep(NA,6)
+for (j in 1:6){
+  usAdult.1July2020.R[j]<- sum(uspopByState.1July2020[uspopByState.1July2020$region==j,"adult"])
+}
+#usAdult.1July2020.R
+
+# get pop as a  fraction of July 1 population
+uspop$bt<-   uspop$ustotal/uspop[uspop$date==as.Date("2020-07-01"),"ustotal"]
+
+
+# create vectors of population and Number dc
+PtAvgR<- NdcAvgR<- NumR<- rep(0,6) 
+n<-nrow(D)
+
+for (i in 1:n){
+  ri<- D$region[i]
+  PtAvgR[ri]<- PtAvgR[ri] + uspop[uspop$date==D$survey_taken_date[i],"bt"] *
+                            usAdult.1July2020.R[ri]
+  cumpos.in.region.on.date<- sum(
+                  StateTotalR[StateTotalR$date==D$survey_taken_date[i] & 
+                  StateTotalR$region==ri,"positive"])
+  NdcAvgR[ri]<-NdcAvgR[ri]+ cumpos.in.region.on.date*(adult.diag.Sept19/total.diag.Sept19)
+  NumR[ri]<- NumR[ri]+1
+}
+# get averages by dividing by number in sum
+PtAvgR<- PtAvgR/NumR
+NdcAvgR<- NdcAvgR/NumR
+
+
+mfactAvgR<-   (PtAvgR - NdcAvgR)/NdcAvgR
+#names(mfactAvgR)<- paste0("Region ",1:6)
+RegionNames<- c("Northeast","Mid-West","Mid-Atlantic","South/Central","Mountain/Southwest","West/Pacific")
+names(mfactAvgR)<- RegionNames
+names(PtAvgR)<-RegionNames
+names(NdcAvgR)<-RegionNames
+```
+
+
+The average adult population in region $k$ is $\bar{P}_t^{(k)}$. For all regions,  $\bar{P}_t^{(k)}$ in millions is:
+```{r}
+PtAvgR/1e6
+```
+
+The average positively confirmed diagnosed cases in region $k$ is $\bar{N}_{dc}^{(k)}$. For all regions,  $\bar{N}_t^{(k)}$ per 100,000 is:
+```{r}
+NdcAvgR/1e5
+```
+
+
+
+The  factor for the $k$th region is then  
+$$\frac{ \left\{ \bar{P}_t^{(k)} - \bar{N}_{dc}^{(k)} \right\}  }{\bar{N}_{dc}^{(k)}}$$, and for all regions are:
+```{r}
+mfactAvgR
+```
+
+which gives estimates and 95% confidence intervals for the rate of undiagnosed infections to diagnosed cases:
+```{r}
+fig3regionF<- matrix(c(
+0.075300881,	0.038726634,	0.123942129,
+0.016069753,	0.00258064,	  0.023636261,
+0.086051554,	0.025647331,	0.189379101,
+0.0300236,	  0.011514981,	0.049793449,
+0.045055316,	0.013094255,	0.094819464,
+0.018751102,	0.001811206,	0.037861422
+),6,3, byrow=TRUE,dimnames=list(RegionNames,c("estimate","lowerCL","upperCL")))
+
+
+for (i in 1:6){
+  fig3regionF[i,]<- fig3regionF[i,]*mfactAvgR[i]
+}
+round(fig3regionF,3)
+
+```
+
+
+## References 
+
+Leeb RT, Price S, Sliwa S, et al. COVID-19 Trends Among School-Aged Children — United States, March 1–September 19, 2020. MMWR Morb Mortal Wkly Rep 2020;69:1410–1415. DOI: http://dx.doi.org/10.15585/mmwr.mm6939e2external
+
+US Census (2020). U.S. and World Population Clock at https://www.census.gov/popclock/ (accessed on December 12, 2020).
+
+
+US Census (2020b). "Estimates of the Total Resident Population and Resident Population Age 18 Years and Older for the United States, Regions, States, and the District of Columbia: July 1, 2020 (SC-EST2020-18+POP-RES)"	https://www2.census.gov/programs-surveys/popest/tables/2010-2020/state/totals/sc-est2020-18+pop-res.xlsx (accessed on March 25, 2021).
+
