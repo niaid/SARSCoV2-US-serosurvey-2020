@@ -1,5 +1,4 @@
-#### This folder included data and R code used to create Figure 3 and 4.
-
+#####This folder included data and R code used to create Figure 3 and 4.
 ##### data folder:
 - `lgtreg.x.sel.rds` --- can be opened in R/Rstuido. It stores output objects from survey::svyglm(), which estimates the propensity of being included in the target data. `/Table1_TableS4/R/PaperTable1_SupplTable4.R` contains the code to generate this data. 
 - `covid2020_x.sel.rds` --- can be opened in R/Rstudio. `/Figure3_Figure4/R/KWpostst5_SelMdl.R` contains the code to generate this data.
