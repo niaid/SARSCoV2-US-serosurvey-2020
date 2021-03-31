@@ -1,4 +1,4 @@
-# SARSCoV2-US-serosurvey-2020 (draft version) 
+# SARSCoV2-US-serosurvey-2020 
 This repository copntains R code for manuscript "Mapping a Pandemic: SARS-CoV-2 Seropositivity in the United States" by Kalish, et al
 https://www.medrxiv.org/content/10.1101/2021.01.27.21250570v1
 
