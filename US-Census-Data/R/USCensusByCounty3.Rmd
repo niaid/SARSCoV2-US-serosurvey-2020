@@ -1,0 +1,522 @@
+---
+title: "Sampling Frames for Seroprevalence Study"
+author: "Michael Fay"
+date: "4/20/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(plyr)
+# since reading in the data takes time, just do it once and save it
+# (get data from CDC website, see link below, and put in data folder)
+#d<-read.csv("../data/cc-est2018-alldata.csv",header=TRUE)
+#save(d,file="allData.RData")
+#load("allData.Rdata")
+##  We only use 2018, so only load that....
+##  YEAR=11 is July 1, 2018 census population estimate
+##  AGEGRP code: 0 
+#d2018<-d[d$YEAR==11,]
+#save(d2018,file="Data2018.RData")
+load("../data/Data2018.Rdata")
+```
+
+
+
+# Overview
+
+
+
+# US Census Data Sources
+
+
+I wanted to get data by county and race. From the best I would tell from the US Census website, the most recent publically available data with that level of detail is 2018. So I got that. Here is the link for it (accessed April 16, 2020)
+
+https://www2.census.gov/programs-surveys/popest/datasets/2010-2018/counties/asrh/cc-est2018-alldata.csv
+
+with the file description
+
+https://www2.census.gov/programs-surveys/popest/technical-documentation/file-layouts/2010-2018/cc-est2018-alldata.pdf
+
+
+We can use this data to make tables by State (and DC), county, age, race. 
+
+I also needed to get the FIPS codes. 
+
+https://www2.census.gov/programs-surveys/popest/geographies/2018/state-geocodes-v2018.xlsx
+
+
+
+## Description and Exploration of Census Data
+
+To make sure I understand the age codes, check 2018 data against this table (see page 7)
+
+https://www2.census.gov/programs-surveys/popest/tables/2010-2018/counties/asrh/PEPAGESEX.pdf
+
+
+```{r}
+pop.by.age<-ddply(d2018,"AGEGRP", summarize, POP=sum(TOT_POP),POP_MILLIONS=sum(TOT_POP)/1e6)
+AGECAT<- c("All",paste(5*c(0:16),"-",5*c(1:17)-1),"85+")
+pop.by.age<-data.frame(AGECAT=AGECAT,pop.by.age)
+pop.by.age
+
+```
+
+
+Check sex. It looks like the Census estimates have MALE+FEMALEf=TOTAL.  
+
+```{r}
+d2018noage<-d2018[d2018$AGEGRP==0,]
+pop.by.sex<-ddply(d2018noage,"AGEGRP", summarize, POP=sum(TOT_POP),POP_MALE=sum(TOT_MALE), POP_FEMALE=sum(TOT_FEMALE))
+pop.by.sex<-data.frame(pop.by.sex,MALE_PLUS_FEMALE=pop.by.sex$POP_MALE+ pop.by.sex$POP_FEMALE)
+pop.by.sex
+
+```
+
+
+
+Check that the race categories are distinct and add up to the total. The code is 
+
+ - WA=White alone
+ - BA=Black or African American alone
+ - IA=American Indian and Alaska Native alone 
+ - AA= Asian alone
+ - NA=Native Hawaiian and Other Pacific Islander alone
+ - TOM= Two or More Races
+
+
+Check that when you add up all the 6 categories, you get the total.
+
+```{r}
+#d2018noage<-d[d$YEAR==11 & d$AGEGRP==0,]
+pop.by.race<-ddply(d2018noage,"AGEGRP", summarize, POP_TOT=sum(TOT_POP),
+                   POP_ADD_RACES=sum(WA_MALE)+sum(WA_FEMALE)+ sum(BA_MALE)+sum(BA_FEMALE)+ sum(IA_MALE)+sum(IA_FEMALE) +sum(AA_MALE)+sum(AA_FEMALE)+sum(NA_MALE)+sum(NA_FEMALE) +sum(TOM_MALE)+sum(TOM_FEMALE),
+                      POP_WA=sum(WA_MALE)+sum(WA_FEMALE), 
+                   POP_BA=sum(BA_MALE)+sum(BA_FEMALE), 
+                   POP_IA=sum(IA_MALE)+sum(IA_FEMALE), 
+                   POP_AA=sum(AA_MALE)+sum(AA_FEMALE), 
+                   POP_NA=sum(NA_MALE)+sum(NA_FEMALE), 
+                   POP_TOM=sum(TOM_MALE)+sum(TOM_FEMALE))
+
+pop.by.race
+                 
+```
+
+
+### Defining Regions
+
+I defined regions by picking groups of states that are contiguous, and such that the total population in each of the 6 groups are approximately equal. First, here are the populations of the states.
+
+
+```{r}
+#d2018noage<-d2018[d2018$AGEGRP==0,]
+
+sFIPS<-read.csv("../data/stateFIPS.csv",header=TRUE)
+sFIPS<-sFIPS[sFIPS$State..FIPS.>0,]
+
+sFIPS$sgrp<- c(rep(1,9),rep(2,6),4,2,4,5,5,5,3,3,4,rep(3,5),3,4,3,4,3,rep(4,3),rep(5,5),6,rep(5,3),rep(6,5))
+
+so<-sFIPS[order(sFIPS$sgrp),]
+dr2018noage<-merge(d2018noage,sFIPS,by.x = "STNAME",by.y="Name")
+dr2018noage$regdiv<- dr2018noage$Region + 0.1*dr2018noage$Division
+
+pop.by.state<-ddply(dr2018noage,"STNAME", summarize, tot_pop=sum(TOT_POP)/1e6)
+drd<-ddply(dr2018noage,"sgrp", summarize, tot_pop=sum(TOT_POP))
+```
+
+
+
+Here are the regions (state groups) I ended up with
+```{r}
+data.frame(STNAME=so$Name,sgrp=so$sgrp)
+```
+and here are the total populations in the 6 state groups (because Census uses the term REGION, I use sgrp for State Group)
+```{r}
+drd
+```
+
+# Proportion Tables on Adults (age 20 or more years)
+
+Our study is based only on adults  (18 and up), but Census data gives ages in 5 year age groups.
+So we split the AGEGRP=4 (15 to 19 year olds) population values into two parts, putting 3/5 into a group defined  AGEGRP=4.0 (15,16,17) and 2/5 into a group defined as AGEGRP=4.6 (18,19). Then we create the adult data set using
+AGEGRP=4.6 and higher only. 
+
+We change the data so that it only has 3 age groups, 18-44, 45-69, and 70+. 
+Then we fix the data so that each row has a unique value for: State/County, AgeGrp3 (3 categories for ages), sex (M/F), hispanic (NH/H), race (6 categories). Because there are 3142 unique state/county values, the 
+number of rows in the data set is 3142*3*2*2*6 = 226224. For each row we have a column called "pop" for the population, and a column called "R10.000" for the proportion of the adult population times 10,000.
+
+```{r}
+# adult data set (start with ages 15 and up)
+dA<-  d2018[d2018$AGEGRP>=4,]
+popVars<- dimnames(dA)[[2]][-c(1:7)]
+# multiple by all population variables by 2/5 when AGEGRP=4 
+for (j in 1:length(popVars)){
+  dA[dA$AGEGRP==4,popVars[j]]<- dA[dA$AGEGRP==4,popVars[j]]*(2/5)
+}
+# redefine AGEGRP=4 to AGEGRP=4.6 (18 and 19 year olds)
+dA$AGEGRP[dA$AGEGRP==4]<-4.6
+group<- function(x,breaks){
+  nb<-length(breaks)-1
+  y<- rep(NA,length(x))
+  for (j in 1:nb){
+     y[x>= breaks[j] & x< breaks[j+1]]<- j     
+  }
+  y
+}
+
+# replace 
+#    dA$AGEGRP  (4.6=18-19,5=20-24,6=25-29,7=30-34,8=35-39,9=40-44,10=45-49,
+#               11=50-54,12=55-59,13=60-64,14=65-69,15=70-74,16=75-79,17=80-84,18=85+) with 
+#    dA$AGEGRP3 (1=18-44,2=45-69,3=70+)
+AGEGRP3<- group(dA$AGEGRP,breaks=c(4.5,9.5,14.5,18.5))
+dA$AGEGRP<- AGEGRP3
+dA.colnames<-dimnames(dA)[[2]]
+# Now sum within AGEGRP3 categories
+# but do this within each state/county combination
+# Take the sum for each race/hispanic combination 
+dA3<-ddply(dA,c("STATE","COUNTY","STNAME","CTYNAME","AGEGRP"),summarize,
+          NHWA_MALE=sum(NHWA_MALE),   
+          NHWA_FEMALE=sum(NHWA_FEMALE),
+          NHBA_MALE=sum(NHBA_MALE),
+          NHBA_FEMALE=sum(NHBA_FEMALE),
+          NHIA_MALE=sum(NHIA_MALE),
+          NHIA_FEMALE=sum(NHIA_FEMALE),
+          NHAA_MALE=  sum(NHAA_MALE),
+          NHAA_FEMALE=sum(NHAA_FEMALE),
+          NHNA_MALE=  sum(NHNA_MALE),
+          NHNA_FEMALE=sum(NHNA_FEMALE),
+          NHTOM_MALE=  sum(NHTOM_MALE),
+          NHTOM_FEMALE=sum(NHTOM_FEMALE),
+          HWA_MALE=sum(HWA_MALE),   
+          HWA_FEMALE=sum(HWA_FEMALE),
+          HBA_MALE=sum(HBA_MALE),
+          HBA_FEMALE=sum(HBA_FEMALE),
+          HIA_MALE=sum(HIA_MALE),
+          HIA_FEMALE=sum(HIA_FEMALE),
+          HAA_MALE=  sum(HAA_MALE),
+          HAA_FEMALE=sum(HAA_FEMALE),
+          HNA_MALE=  sum(HNA_MALE),
+          HNA_FEMALE=sum(HNA_FEMALE),
+          HTOM_MALE=  sum(HTOM_MALE),
+          HTOM_FEMALE=sum(HTOM_FEMALE) )
+
+
+# I got a weird error if I did not use stringsAsFactors=FALSE
+# I am calling the vname values as variable names, so they should 
+# be factors
+shrCODES<- data.frame(
+  vname=dimnames(dA3)[[2]][-c(1:5)],
+  sex=rep(c("M","F"),12),
+  hispanic=rep(c("NH","H"),each=12),
+  race=rep(rep(c("WA","BA","IA","AA","NA","TOM"),each=2),2),stringsAsFactors = FALSE)
+
+#shrCODES
+
+
+N<- nrow(dA3)
+for (i in 1:nrow(shrCODES)){
+  DA3.temp<- data.frame(dA3[,1:5],sex=NA,hispanic=NA,race=NA,pop=rep(0,N))
+  DA3.temp$pop<- dA3[,shrCODES$vname[i]]
+  DA3.temp$sex<- rep(shrCODES$sex[i],N)
+  DA3.temp$hispanic<-rep(shrCODES$hispanic[i],N)
+  DA3.temp$race<-rep(shrCODES$race[i],N)
+  if (i==1){
+    DA3<-DA3.temp
+  } else {
+    DA3<-rbind(DA3,DA3.temp)
+  }
+}
+
+
+# check...should have 24 times the rows of dA3
+#nrow(DA3)/nrow(dA3)
+# check...should be zero...within numeric error
+#sum(DA3$pop)-sum(dA$TOT_POP)
+adult_pop_total<- sum(DA3$pop)
+DA3$R10.000<- 1e4*DA3$pop/adult_pop_total
+# check
+#sum(DA3$R10.000)
+#head(DA3)
+#write.csv(DA3,file="Census3AgeGroups.csv")
+
+
+# Add columns for AGEGRPNAME, RACENAME, ETHNICITY
+addName<- function(x,value,name){
+  n<-length(x)
+  outName<-rep(NA,n)
+  uvalue<-unique(x)
+  if (length(uvalue)!=length(value)) stop("extra catgegories in x")
+  for (j in 1:length(value)){
+    outName[x==value[j]]<- name[j]
+  }  
+  outName
+}
+
+DA3$AGEGRPNAME<-addName(DA3$AGEGRP,1:3,c("18-44","45-69","70+"))
+DA3$RACENAME<- addName(DA3$race,c("WA","BA","IA","AA","NA","TOM"),
+                       c("White Alone","Black Alone","American Indian Alone","Asian Alone","Pacific Islander Alone","Two or More"))
+DA3$HISPNAME<- addName(DA3$hispanic,c("H","NH"),c("Hispanic","Not Hispanic"))
+
+write.csv(DA3,file="Census3AgeGroupsWithNames.csv")
+
+
+```
+
+Here are the first few rows of the adult data file:
+```{r}
+head(DA3)
+```
+## Check DA3 Data set
+
+
+We check the DA3 database. First check tables by race. We check it two ways.
+```{r}
+#d2018noage<-d[d$YEAR==11 & d$AGEGRP==0,]
+dA3.temp<-dA3
+dA3.temp$const<-1
+pop.by.race<-ddply(dA3.temp,"const", summarize, 
+                   POP_WA=sum(NHWA_MALE)+sum(NHWA_FEMALE)+sum(HWA_MALE)+sum(HWA_FEMALE), 
+                   POP_BA=sum(NHBA_MALE)+sum(NHBA_FEMALE)+sum(HBA_MALE)+sum(HBA_FEMALE), 
+                   POP_IA=sum(NHIA_MALE)+sum(NHIA_FEMALE) + sum(HIA_MALE)+sum(HIA_FEMALE), 
+                   POP_AA=sum(NHAA_MALE)+sum(NHAA_FEMALE) + sum(HAA_MALE)+sum(HAA_FEMALE), 
+                   POP_NA=sum(NHNA_MALE)+sum(NHNA_FEMALE) +sum(HNA_MALE)+sum(HNA_FEMALE), 
+                   POP_TOM=sum(NHTOM_MALE)+sum(NHTOM_FEMALE)+sum(HTOM_MALE)+sum(HTOM_FEMALE))
+
+pop.by.race
+
+# 
+pop.by.race.check<-ddply(DA3,"race", summarize,sum=sum(pop))
+
+sum(DA3[DA3$race=="WA","pop"])
+
+pop.by.race.check
+                 
+```
+Now check by age group.
+
+```{r}
+adult_by_agegrp<-ddply(dA,"AGEGRP",summarize, POP=sum(TOT_POP), R10.000=1e4*sum(TOT_POP)/adult_pop_total )
+
+adult_by_agegrp_check<-ddply(DA3,"AGEGRP",summarize, POP=sum(pop))
+CHECK<- round(sum(adult_by_agegrp$POP-adult_by_agegrp_check$POP),6)==0
+CHECK
+adult_by_agegrp
+
+```
+Check by state
+```{r}
+adult_by_state<-ddply(dA,"STNAME",summarize, POP=sum(TOT_POP), R10.000=1e4*sum(TOT_POP)/adult_pop_total )
+adult_by_state
+astate.check<-ddply(DA3,"STNAME",summarize, POP=sum(pop))
+CHECK<- sum(adult_by_state$POP - astate.check$POP)==0
+CHECK
+```
+
+
+
+
+# Two Dummy Demographic Data Sets
+
+```{r}
+Nsamp<- 1000
+```
+
+I create two dummy data sets with `r Nsamp` people in each. The first data set is an actual probability in proportion to size sampling. The second data set is each cell (county, age, sex, race, ethnicity) has equal probability. This will give an extreme oversampling of minorities and rural areas. 
+
+
+```{r}
+set.seed(200292)
+cumpop<- cumsum(DA3$pop)
+pick1<- runif(Nsamp)*adult_pop_total
+I1<- rep(NA,Nsamp)
+I<- 1:nrow(DA3)
+for (i in 1:Nsamp){
+  diff<- (pick1[i]-cumpop)
+  I1[i]<- min(I[diff<0])
+}
+
+dummyDemo1<- DA3[I1,]
+dummyDemo1$id<- 1:Nsamp
+write.csv(dummyDemo1,file="dummyDemo1.csv")
+
+set.seed(3011)
+pick2<-floor(runif(Nsamp)*nrow(DA3))
+I2<- rep(NA,Nsamp)
+I<- 1:nrow(DA3)
+for (i in 1:Nsamp){
+  diff<- (pick2[i]- I)
+  I2[i]<- min(I[diff<0])
+}
+dummyDemo2<- DA3[I2,]
+dummyDemo2$id<- 1:Nsamp
+write.csv(dummyDemo2,file="dummyDemo2.csv")
+```
+
+
+
+
+Check Tables AgeGRP:
+
+```{r}
+adult_by_agegrp_per10.000<-ddply(DA3,"AGEGRP",summarize, per10.000=sum(R10.000))
+#adult_by_state_per10.000
+
+dummyDemo1_per10.000<-1e4*table(dummyDemo1$AGEGRP)/nrow(dummyDemo1)
+dummyDemo2_per10.000<-1e4*table(dummyDemo2$AGEGRP)/nrow(dummyDemo2)
+
+adult_by_agegrp_per10.000$dummyDemo1_per10.000<- dummyDemo1_per10.000
+adult_by_agegrp_per10.000$dummyDemo2_per10.000<- dummyDemo2_per10.000
+adult_by_agegrp_per10.000
+
+```
+
+Tables by Sex:
+```{r}
+adult_by_sex_per10.000<-ddply(DA3,"sex",summarize, per10.000=sum(R10.000))
+#adult_by_state_per10.000
+
+dummyDemo1_per10.000<-1e4*table(dummyDemo1$sex)/nrow(dummyDemo1)
+dummyDemo2_per10.000<-1e4*table(dummyDemo2$sex)/nrow(dummyDemo2)
+
+adult_by_sex_per10.000$dummyDemo1_per10.000<- dummyDemo1_per10.000
+adult_by_sex_per10.000$dummyDemo2_per10.000<- dummyDemo2_per10.000
+adult_by_sex_per10.000
+
+```
+
+Tables by Race:
+```{r}
+adult_by_race_per10.000<-ddply(DA3,"race",summarize, per10.000=sum(R10.000))
+#adult_by_state_per10.000
+
+dummyDemo1_per10.000<-1e4*table(dummyDemo1$race)/nrow(dummyDemo1)
+dummyDemo2_per10.000<-1e4*table(dummyDemo2$race)/nrow(dummyDemo2)
+
+adult_by_race_per10.000$dummyDemo1_per10.000<- dummyDemo1_per10.000
+adult_by_race_per10.000$dummyDemo2_per10.000<- dummyDemo2_per10.000
+adult_by_race_per10.000
+
+```
+
+Tables by HIspanic/Non-Hispanic:
+```{r}
+adult_by_hispanic_per10.000<-ddply(DA3,"hispanic",summarize, per10.000=sum(R10.000))
+#adult_by_state_per10.000
+
+dummyDemo1_per10.000<-1e4*table(dummyDemo1$hispanic)/nrow(dummyDemo1)
+dummyDemo2_per10.000<-1e4*table(dummyDemo2$hispanic)/nrow(dummyDemo2)
+
+adult_by_hispanic_per10.000$dummyDemo1_per10.000<- dummyDemo1_per10.000
+adult_by_hispanic_per10.000$dummyDemo2_per10.000<- dummyDemo2_per10.000
+adult_by_hispanic_per10.000
+
+```
+
+Check Tables State:
+
+```{r}
+adult_by_state_per10.000<-ddply(DA3,"STNAME",summarize, per10.000=sum(R10.000))
+#adult_by_state_per10.000
+
+dummyDemo1_per10.000<-1e4*table(dummyDemo1$STNAME)/nrow(dummyDemo1)
+dummyDemo2_per10.000<-1e4*table(dummyDemo2$STNAME)/nrow(dummyDemo2)
+
+adult_by_state_per10.000$dummyDemo1_per10.000<- dummyDemo1_per10.000
+adult_by_state_per10.000$dummyDemo2_per10.000<- dummyDemo2_per10.000
+adult_by_state_per10.000
+
+```
+
+
+## Adding Urban/Rural to County Values
+
+
+On the Census website, it states that every decenial census they define each county into three categories:
+
+* mostly urban (total=1,253   colored BLUE)
+* mostly rural (total=1,185   colored GREEN)
+* completely rural (total=704 colored ORANGE) 
+
+So we get that data from the 2010 Census at (May 15, 2020 accessed):
+
+http://www2.census.gov/geo/docs/reference/ua/County_Rural_Lookup.xlsx
+
+
+Then Jing Wang took that data, and added an extra column to the master file. 
+The code for that merging and the checks are below (not shown). It is not rerun in this R markdown file.
+
+During the merging process, Jing noticed that two county names (shown in the following table) were not quite consistent across the two source data. 
+She kept the names in the original Census3AgeGroupsWithNames.csv file and updated the corresponding names in the County_Rural_Lookup.xlsx file to complete the data merging. 
+
+From datasets, here are the two counties with different names:
+
+*  from Census3AgeGroupsWithNames.csv      
+"Petersburg Borough, Alaska", 
+
+* from County_Rural_Lookup.xlsx 
+"Petersburg Census Area, Alaska"
+
+*  from Census3AgeGroupsWithNames.csv      
+"LaSalle Parish, Louisiana" 
+
+* from County_Rural_Lookup.xlsx 
+"LaSalle Parish, Louisiana"
+
+
+
+```{r eval=FALSE}
+library(readxl)
+library(dplyr)
+library(stringr)
+
+*indir <- "C:\\Users\\wangj27\\Desktop\\"
+indir<- "../data/"
+dta_color <- read_excel(paste0(indir, "Copy of County_Rural_Lookup_colorColAdded.xlsx"),sheet=2)
+dta_target <- read.csv(paste0(indir, "Census3AgeGroupsWithNames.csv"),header = TRUE,
+                       stringsAsFactors = FALSE)
+
+
+
+# From dataset: Census3AgeGroupsWithNames.csv	      From dataset: County_Rural_Lookup.xlsx
+# Petersburg Borough, Alaska	                       Petersburg Census Area, Alaska
+# LaSalle Parish, Louisiana	                         La Salle Parish, Louisiana
+dta_color2 <- dta_color%>%
+  mutate(`2015 Geography Name`=ifelse(`2015 Geography Name`=="Petersburg Census Area, Alaska",
+                                      "Petersburg Borough, Alaska",
+                                      ifelse(`2015 Geography Name`=="La Salle Parish, Louisiana",
+                                             "LaSalle Parish, Louisiana",`2015 Geography Name`)))%>%
+  select(`2015 Geography Name`, Color)
+
+  
+dta_target2 <- dta_target%>%
+  mutate(`2015 Geography Name`= paste0(CTYNAME,", ",STNAME))%>%
+  full_join(dta_color2, by=("2015 Geography Name"))
+
+
+#### check for any mismatched between the two datasets:
+# check records in data 1, but not in data 2
+# check1 <- dta_target%>%
+#   mutate(`2015 Geography Name`= paste0(CTYNAME,", ",STNAME))%>%
+#   anti_join(dta_color2, by=("2015 Geography Name"))
+# 
+# check records in data 2, but not in data 1
+# dta_target3<- dta_target%>%
+#   mutate(`2015 Geography Name`= paste0(CTYNAME,", ",STNAME))
+# check2 <-dta_color2%>%
+#   anti_join(dta_target3, by=("2015 Geography Name"))
+
+
+write.csv(dta_target2, paste0(indir,"Census3AgeGroupsWithNames_colorAdded_May15th2020.csv"),
+          row.names = FALSE, na="")
+
+
+# final check by Mike. Replace color names in .csv file and count the number of replacements, divide by the number of counties 
+# for each color. This equals 72=2*3*6*2 (for 2 sexes, 3 age grps, 6 race groups, 2 ethnicities)
+# c(90216,85320,50688)/c(1253,1185,704)
+
+```
+
+
+
+
