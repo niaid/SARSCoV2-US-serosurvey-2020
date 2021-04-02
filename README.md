@@ -6,7 +6,7 @@ The main data collected from the study is not available at this time; therefore 
 
 ## Overview
 
-There are many analyses in the paper, that use several data set (see especially Figure 1 of the paper). This repository contains R code for the main analyses in several different folders (each with its own Readme.md file). 
+There are many analyses in the paper, that use several data sets used (see especially Figure 1 of the paper). This repository contains R code for the main analyses in several different folders (each with its own Readme.md file). 
 
 1. US_Census: contains R markdown that tells the URL addresses from where the US census data files were gotten, and it gives the R code used to combine the several different US census files.
 2. Serosurvey_Sampling: contains R markdown that explains the algorithm to create the invitations to join the study for the quota sampling.
