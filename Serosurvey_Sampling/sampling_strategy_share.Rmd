@@ -1,0 +1,368 @@
+---
+title: "NIAID Seroprevlaence Study: Sampling Implementation"
+author: "Nalyn Siripong"
+date: "March 31, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = FALSE, message=FALSE, warning=FALSE)
+library(tidyverse)
+library(readxl)
+library(tidyverse)
+library(readxl)
+library(RForcecom)
+library(foreach)
+library(doParallel)
+
+# LOAD FORMULAS 
+source("functions.R")
+
+fnames <- c("STNAME", "urban.rural", 
+            "AGEGRP", "sex", "hispanic", "race")
+
+```
+
+## Objective 
+The primary objective of this work was to identify a sample of participants from our list of volunteers who are generally representative of the country overall. 
+
+## Overall Process
+The overall process will contain several steps: 
+* Define Sampling Targets: We have a target file that defines strata based on combined characteristics of Sex, Age group, Ethnicity, Race, State, and Rural/Urban status (based on county), and we use the contributions of each stratum to the US population and apply it to the a target sample of 10,000
+* Update Sampling Targets: 
+* Mapping Volunteer Roster to Targets: We classify our roster of volunteers (i.e., people who emailed us and then filled out a preliminary Qualtrics survey) into categories that align with our targets. Then, we then take the sum of volunteers available in each of the possible 9936 sub-classifications that exist in our target file and match them to the target file. From here, we define a probability of being sampled as the target number, divided by the number in our pool of volunteers available to us for that stratum . 
+
+When we ran this analysis on the number of people currently available, there are two concerns or issues: (1) a number of the sub-classifications have a target value less than one, so sampling even one person would over-sample that specific group; and (2) there are other sub-classifications where our pool available falls short of desired target number. Thus, after taking into account this strict matching on all possible characteristics of interest, we increase sampling weights on the margins of categories where the sample size is deficient. 
+
+After applying these sampling weight adjustments, we then take 10,000 random samples of size S (our desired sample size is for that day's list), and determine which sample most closely aligns with the overall demographic characteristic of our desired targets, using a squared sum of differences approach. 
+
+
+### Defining Sampling Targets
+Sampling targets proportions were defined for each combination of the following characteristics: 
+1. urbanicity (u) , 3 values [completely rural, mostly rural, mostly urban]
+2. state (v), 51 values [50 States + District of Columbia] 
+3. age group (w), 3 values [18-44, 45-69, 70+]
+4. sex (x), 2 values [Male,  Female] 
+5. ethnicity (y), 2 values [Hispanic, Non-Hispanic]
+6. race (z), 6 values [White, Black, Native American, Asian, Pacific Islander, More than one Race]
+
+We defined target sample sizes, based on each sub-population's relative contribution to the overall US population (p_uvwxyz) and applying that to our overall study sample size of 10,000: 
+
+T_uvwxyz = p_uvwxyz * 10000
+
+While many of these proportions are very small, we keep all categories in our targets, so that we can measure our observed sample against the "ideal" sample (even if it that sample contains fractions of people).  
+
+This dataset has one row for each unique, observed combination of the above characteristics (9936 out of 11,016 possible), and one column for each of the six characteristic categories describe above, as well as the target sample size. A sample of the first few rows of this dataset is provided below: 
+
+```{r}
+# FILE OF POPULATION TARGETS
+tdat <- read.csv("data/Census3AgeGroupsWithNames_UrbanRural.csv", stringsAsFactors = FALSE)
+
+# CLEAN TARGETS FILE 
+source("tdat_clean.R")
+
+# SELECT RELEVANT COLUMNS FROM CLEANED DATASETS
+targets <- tdat[, c("region", "County", "CTYNAME", fnames, "pop", "R10.000")]
+
+```
+
+
+```{r, include=TRUE}
+
+# NEXT, LET'S AGGREGATE TARGET NUMBERS UP TO URBAN/RURAL (FROM COUNTY) 
+targets <- targets %>% 
+  group_by(region, STNAME, AGEGRP, sex, hispanic, race, urban.rural) %>% 
+  summarise(pop = sum(pop), R10.000 = sum(R10.000)) %>%
+  as.data.frame() 
+
+head(targets)
+
+```
+
+
+
+
+## Updating Sampling Targets 
+If a number of participants have already been enrolled, we need to adjust our sampling targets to account for these data. So first, we compile the demographic characteristics of the enrolled sample so that they can be mapped back 1:1 to our target sample data, and the number enrolled in each category is subtracted from the target sample size.
+
+A sample of the first few rows of this update data set is shown below: 
+
+```{r}
+# READ REDCAP DATA 
+filename <-  dir("data/")[grep("NIHCOVID19AntibodySt", dir("data/"))]
+rdat <- read.csv(paste("data/", filename, sep = "") , stringsAsFactors = FALSE)
+
+# CLEAN ZIP TO COUNTY MATCHING FILE 
+source("zip_county_lookup.R")
+
+# CLEAN REDCAP FILE 
+source("REDCap Cleaning.R")
+
+
+```
+
+```{r, echo=TRUE}
+
+rdat <- rdat %>% rename(Id = RC.Id) %>% 
+  select(Id, STNAME, CTYNAME, AGEGRP, sex, race, hispanic) %>% 
+  left_join(tdat %>% select(STNAME, CTYNAME, AGEGRP, sex, hispanic, 
+                            race, urban.rural, region, StateFIPS, County)) 
+
+enrolled <- rdat %>% select(STNAME, CTYNAME, AGEGRP, sex, race, hispanic) %>% 
+  left_join(urban, by = c("STNAME", "CTYNAME")) %>% 
+  group_by(STNAME, sex, AGEGRP, race, hispanic, urban.rural) %>% 
+  summarise(n = n()) %>% as.data.frame
+
+targets <- targets %>% 
+  left_join(enrolled, by = c(fnames)) %>% 
+  as.data.frame() 
+
+targets$n[is.na(targets$n)] <- 0 
+targets$newtarget <- targets$R10.000 - targets$n 
+
+t1 <- sum(targets$n)
+t2 <- as.integer(round(sum(targets$R10.000),0))
+t3 <- round(sum(targets$newtarget), 0)
+
+head(targets)
+
+
+```
+
+From here, we update our target sample by subtracting the number who consented (tracked in RedCap) from the original target number, to give us the 'New Target'. After doing this, we can check that we have enrolled `r t1` out of our `r t2` and have `r t3` left to enroll in the study.
+
+At this step, we would KEEP negative targets, because most of the sub-classifications have targets < 1, so even getting one person into the group will make the target go negative; however, we are not focused on the specific categories and instead look at the overall proportions. In other words, we need an overall even distribution of males and females, but they do not necessarily have to (or can) be exactly even within each county and age group and race.  
+
+
+## Mapping Volunteer Roster to Targets 
+Since volunteers were asked to submit demographic information through an online survey, we are able to map volunteers' characteristics back to their target sample size, and assign each person within the demographic sub-category an equal probability of being selected. In other words, if we needed 10 Asian Non-Hispanic women, aged 18-44. living in a mostly urban area of California, and there were 100 volunteers with these reported characteristics in our sample, each of them would have a 10% chance of being selected for this category. [Note: Here, we need only calculate the probabilities within each stratum, as the sampling function will account for each stratum's contribution to the overall sample.]
+
+To implement this, we first remove anyone who was already approached or who has consented to the study from our volunteer roster. Then, we calculate the total number eligible within each stratum used in the targets data. 
+
+After that, we should have two data sets that can be merged 1:1 and give us the following: 
+
+```{r}
+
+edat <- read.csv("data/Volunteers_deidentified.csv")
+
+pooldat <- edat %>% 
+  group_by( AGEGRP, sex, hispanic, race, STNAME, urban.rural) %>% 
+  summarise(pool = n()) %>% 
+  full_join(targets, by=c(fnames)) %>% as.data.frame() 
+
+pooldat$shortfall <- pooldat$newtarget - pooldat$pool
+pooldat$shortfall[is.na(pooldat$shortfall)] <- pooldat$newtarget[is.na(pooldat$shortfall)]
+pooldat$shortfall[pooldat$shortfall < 0] <- 0
+
+```
+
+```{r, echo=TRUE}
+
+head(pooldat)
+```
+
+
+
+We use this dataset for two purposes: (1) to determine which categories have insufficient sample size (using our strict matching) and should be up-weighted; and (2) to estimate the sampling probabilities for each person in our pool of volunteers. 
+
+
+### Identifying characteristics where sample size is deficient 
+We first use this information to define the demographic classifications where we are deficient. So we can look at these numbers overall to assess how well/poorly we are doing on each of the six categories defined in our objectives. To do this, we sum the new target number needed by each demographic characteristic, and the sum of the number available (on our strict matching criteria), and then we calculate the shortfall as the difference between the new target (newtarget) and the number available in that specific category (pool).   
+
+```{r, echo=TRUE}
+
+for (l in fnames) {  print(compare.prop(l)) }
+
+```
+
+Or, to look at just non-region 3: 
+
+```{r, echo=TRUE}
+
+pooln3 <- as.data.frame(pooldat %>% filter(region!=3))
+for (l in fnames) { print(compare.prop(l, pooln3)) }
+
+```
+
+If we appear to be deficient in certain categories, then we can simply increase the probability weights on people with these characteristics. In other words, if we are deficient in people aged 70+, we can increase the sampling probability for anyone in this age group by 10-50%. This adjustment range seems to be sufficient to get us relatively close to the desired targets (for now) but we could consider adjusting them later.  
+
+
+### Defining sampling probabilities 
+For each of our 9936 sub-classifications, then, we can designate a probability sample as the updated target number (newtarget) within that sub-classification divided by the pool of volunteers available in the corresponding sub-classification. 
+
+```{r, include=TRUE}
+
+sdat <- edat %>% inner_join(pooln3, by = fnames)
+
+sdat$prob <- (sdat$newtarget / sdat$pool)
+
+head(sdat)
+
+```
+
+#### How do we deal with negative probabilities? 
+Some specific sub-classifications may now have a negative target because the initial target was less than one and we recruited one person. Since we have technically exceeded the target needed in this sub-group, we should be able to remove these individuals from the sampling pool. 
+
+```{r}
+# SAVE ALL THE GROUPS WITH NEGATIVE PROBABILITIES IN CASE WE WANT TO BRING THEM BACK IN 
+nprob <- sdat[sdat$prob < 0, ]
+
+# AND THEN FILTER THE MAIN DATASET TO INCLUDE ONLY PROBABILITIES > 0 
+sdat <- sdat[sdat$prob > 0, ] 
+
+```
+
+We then increased probability weights on demographics where sample size was insufficient by more than 10% , based on marginal demographics. Since there are potential compounding effects of up-weighting groups that filled multiple deficient categories (e.g., if we lacked older African-American women, then we may end up increasing the weights three times: once for age, once for race, and once for sex), adjustments were ad-hoc, based on the judgments of the investigators. 
+
+
+## Sampling Process 
+Next, we will run multiple samples of the population, using the built-in sample function in R, which allows us to specify a desired sample size and sampling probabilities for each row (volunteer) in our table. For exploratory purposes, I've fun 1000 draws, compraing a two approaches: 
+
+(1) Use sampling probabilities as defined above, and make up for our "shortfalls" in the selection of the best-fitting samples; or 
+(2) Increase/decrease sampling weights on the margins (i.e., increase sampling probability of all Blacks, since we know we are deficint in this population)
+Based on the overall shortfalls listed above, we may want to down-weight sampling of whites and urban areas, and increase the weights on males and the elderly (70 and older).
+
+We used separate calculations to determine the number of people who should be called per day for UAB and Pitt (s1 = s1a + s1b) or for NIAID (s2). We then take sample of size s from our volunteer pool, where each individual's probability of being selected were defined in the previous section. We repeat this sampling 10,000 times so that we have 10,000 sets of samples of size s. 
+
+First, we set up our objective proportions for each demographic category of interest: 
+```{r, include=TRUE}
+
+# Because lists were generated for Region 3 vs. Others independently, we set different objective independently 
+targetlist <- data.frame()
+for (i in fnames) {
+  targetlist <- rbind(targetlist,
+                      aggregate(targets$newtarget[targets$region!=3],
+                                by = list(targets[targets$region!=3, i]),FUN = sum)
+  )
+}
+
+datsummary1 <- as.data.frame(t(targetlist$x)/sum(targets$newtarget[targets$region!=3]))
+names(datsummary1) <- targetlist$Group.1
+datsummary1
+
+targetlist <- data.frame()
+for (i in fnames) {
+  targetlist <- 
+    rbind(targetlist,
+          aggregate(targets$newtarget[targets$region==3],
+                    by = list(targets[targets$region==3, i]),
+                    FUN = sum)
+    )
+}
+
+datsummary3 <- as.data.frame(
+  t(targetlist$x)/sum(targets$newtarget[targets$region==3]))
+names(datsummary3) <- targetlist$Group.1
+datsummary3
+
+
+```
+
+Next, we take a specified number of draws of a random sample from region 3 and all other regions: 
+
+```{r, include=TRUE}
+
+# THIS USES MULTIPLE CORES, BASED ON AVAILAIBLITY ON THE MACHINE, TO COMPLETE SAMPLING PROCESS EFFICIENTLY 
+(numCores <- detectCores())
+registerDoParallel(numCores)  # use max available 
+
+
+# SET NUMBER OF REPILCATE SAMLES 
+n <- 30 # 20000
+s1 <- 15*20 + 8*40 # desired sample size 
+
+gc(); print(Sys.time())
+
+# SET SEED, IF DESIRED: 
+set.seed(1001) 
+
+r3sample <- list()
+samples <- list()
+rdat3 <- rdat %>% select(c("Id", all_of(fnames), "region")) %>% filter(region != 3)
+
+dat1 <- sdat[sdat$region!=3, ]
+
+rows <- foreach (i=1:n) %dopar% { sample(x = dat1$Id, size = s1, replace = FALSE, prob = dat1$prob) }
+
+# GARBAGE COLLECTOR / PRINT SYS TIME TO MONITOR PROCESSING TIME AND CLEAN-UP MEMORY 
+# gc(); print(Sys.time())
+
+samples <- foreach(i=1:n) %dopar% { sdat[sdat$Id %in% rows[[i]], c("Id", fnames, "region")] }
+
+# print(Sys.time()); gc()
+
+f <- length(fnames)
+rdat3 <- rdat %>% filter(region!=3) %>% select(c("Id", all_of(fnames), "region")) %>% as.data.frame()
+
+# gc(); print(Sys.time())
+
+l1 <- l3 <- c() 
+for (i in 1:n) { 
+  k1 <- samples[[i]][ ,c("Id", all_of(fnames), "region")]
+  
+  k2 <- rbind(k1, rdat3) 
+  l3 <- foreach (j=1:f, .combine=c) %do% { 
+    as.vector(prop.table(table(k2[, fnames[j] ] ) ) ) 
+  }
+  datsummary3 <- rbind(datsummary3, l3)
+  
+  l1 <- foreach (j=1:f, .combine=c) %do% { 
+    as.vector(prop.table(table(k1[, fnames[j] ] ) ) ) 
+  }
+  datsummary1 <- rbind(datsummary1, l1)
+} 
+
+# gc(); print(Sys.time())
+
+```
+
+To select the "best" sample (out of the 10,000 available), we calculate the marginal proportions of our sample in each group and compare it to the desired breakdown according to our updated targets. In other words, we will calculate the percent male/female in each of the 10,000 samples, and compare that to the percent male/female according to our updated targets. We weight each characteristic equally, so that deviation from the desired proportions for a specific state are not weighted equally as deviation of one sex. Instead, deviations for all states as a whole are weighted equally as deviations across races, sex, or age group. 
+
+```{r, include=TRUE}
+# Currently set up to evaluate sample for non-region 3 
+# Commented lines evalute Region 3 only 
+
+eval3 <- eval1 <- list()
+eval1[[1]] <- eval3[[1]] <- 2:3 
+eval1[[2]] <- eval3[[2]] <- 4
+eval1[[3]] <- eval3[[3]] <- 6
+eval1[[4]] <- eval3[[4]] <- 8:12 
+eval1[[5]] <- eval3[[5]] <- 14:15 
+eval1[[6]] <- eval3[[6]] <- 17:ncol(datsummary1)
+
+
+for (m in 1:6) {
+  for (i in 1:(n+1)) {
+    v <- w <- 0 
+    for (j in eval1[[m]]) {
+      w <- abs(datsummary1[i, j] - datsummary1[1, j]) 
+      w <- w**2 
+      v <- sum(v, w)
+      
+    x <- y <- 0   
+      x <- abs(datsummary3[i, j] - datsummary3[1, j])
+      x <- x**2 
+      y <- sum(y, x)
+    }
+    datsummary1[i, paste("dist",m,sep="")] <- v
+    datsummary3[i, paste("dist",m,sep="")] <- y
+  }
+}    
+
+datsummary1$dist <- (datsummary1$dist1)/2 + (datsummary1$dist2) + (datsummary1$dist3) + 
+  (datsummary1$dist4)/5 + (datsummary1$dist5)/2 + (datsummary1$dist6)/(length(eval1[[6]]))
+
+# datsummary3$dist <- (datsummary3$dist1)/2 + (datsummary3$dist2) + (datsummary3$dist3) + 
+#   (datsummary3$dist4)/5 + (datsummary3$dist5)/2 + (datsummary3$dist6)/(length(eval3[[6]]))
+
+head(datsummary1[order(datsummary1$dist), ])
+# head(datsummary1[order(datsummary1$dist), ])
+
+
+
+### NEW NON-REGION 3 TARGET DATA: 
+x <- which.min(datsummary1$dist[-1])
+# x <- which.min(datsummary3$dist[-1])
+
+```
+
