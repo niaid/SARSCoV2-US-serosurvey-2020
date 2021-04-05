@@ -357,13 +357,13 @@ final<-out_kw%>%
 ################
 ### Figure 3
 ################
-dta0 <- read_excel("Copy of Copy of Adjusted_Prevalence_KWmethod_SixQuotaVariable_09Dec2020.xlsx",
+dta0 <- read_excel("Modification of Adjusted_Prevalence_KWmethod_SixQuotaVariable_09Dec2020.xlsx",
                    sheet="OneSpike_OneRBD_3SD")
 
 names(final)<-c("Index","subgroup","n","est_Yan","se_Yan","est","LCL","UCL")
 dta0<-final[1:30,1:8]
 
-simple <- read_excel("Copy of PropPositive_SimpleMethod_AllVariables_03Dec2020.xlsx",
+simple <- read_excel("Modification of PropPositive_SimpleMethod_AllVariables_03Dec2020.xlsx",
                      sheet="OneSpike_OneRBD_3SD01")
 names(simple)<-c("Index","subgroup","n","est_Yan","se_Yan","est","LCL","UCL")
 simple_6<-simple[1:30,1:8]
