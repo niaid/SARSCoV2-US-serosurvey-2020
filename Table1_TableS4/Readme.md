@@ -2,8 +2,8 @@ This folder includes R code used to generate Table 1 and Supplemental Table 4.
 
 
 ##### R folder:
-- ``
--	`merge data CovidBrfss.R` --- clean and merge the BRFSS data with the Serosurvey data. The merged output is called “BRFSS2018COVID9028.csv” (not included)
+- `Add_urbalrural_seropositivity.R` --- extract urbal/rural variable from the Census data; define NCHS urban/rural variable based on NCHS classification scheme; add seropositivity outcomes by evaluating 300 negative and 56 positive samples from the "finaldataforEUA.xlsx" data (not included); create output data "NIHCOVID19AntibodySt_DATA_CODES_2020-10-27.csv" (not included).
+-	`merge data CovidBrfss.R` --- clean and merge the BRFSS data with the "NIHCOVID19AntibodySt_DATA_CODES_2020-10-27.csv" data. The merged output is called “BRFSS2018COVID9028.csv” (not included)
 -	`PaperTable1_SupplTable4.R` --- R code to construct Table 1 and Table S4. The input data include “BRFSS2018COVID9028.csv” and the Census data, “Census3AgeGroupsWithNames_UrbanRural.csv” (not included).
 
 ##### data folder (not included):
