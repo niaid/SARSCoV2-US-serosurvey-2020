@@ -15,3 +15,4 @@ There are many analyses in the paper, that use several data sets used (see espec
 5. Ratio_of_Counts: contains R markdown to detail the estimate of the ratio of undiagnosed infections over diagnoses cases from the study. 
 
 
+https://zenodo.org/badge/349515159.svg
